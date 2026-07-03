@@ -119,5 +119,27 @@ class PaymentControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void createPaymentReturnsStructuredErrorOnValidationFailure() throws Exception {
+        mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "",
+                                  "amount": 0,
+                                  "currency": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp", notNullValue()))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Validation failed for request payload"))
+                .andExpect(jsonPath("$.fieldErrors").isArray())
+                .andExpect(jsonPath("$.fieldErrors[0].field").exists())
+                .andExpect(jsonPath("$.fieldErrors[0].rejectedValue").exists())
+                .andExpect(jsonPath("$.fieldErrors[0].message").exists());
+    }
 }
 
