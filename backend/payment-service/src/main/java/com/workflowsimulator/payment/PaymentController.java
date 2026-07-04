@@ -41,6 +41,7 @@ class PaymentController {
             description = "Invalid request payload",
             content = @Content)
     PaymentResponse createPayment(@Valid @RequestBody CreatePaymentRequest request) {
+        // PAY-1001 keeps currency support explicit until configuration-backed rules are introduced.
         if (!SUPPORTED_CURRENCIES.contains(request.currency())) {
             throw new PaymentDomainException(
                     "PAYMENT_UNSUPPORTED_CURRENCY",

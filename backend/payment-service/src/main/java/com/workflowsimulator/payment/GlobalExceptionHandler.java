@@ -20,6 +20,7 @@ class GlobalExceptionHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
+    // Keep validation failures searchable by support teams through a stable log marker and trace ID.
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErrorResponse> handleValidation(
             MethodArgumentNotValidException ex,
@@ -49,6 +50,7 @@ class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    // Expected business exceptions are logged without stack traces but still carry a stable error code.
     @ExceptionHandler(PaymentDomainException.class)
     ResponseEntity<ErrorResponse> handleDomainException(
             PaymentDomainException ex,
