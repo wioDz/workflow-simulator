@@ -11,6 +11,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/payments")
 @Tag(name = "Payment", description = "Payment management APIs")
 class PaymentController {
+
+    private static final Set<String> SUPPORTED_CURRENCIES = Set.of("USD");
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -38,6 +41,13 @@ class PaymentController {
             description = "Invalid request payload",
             content = @Content)
     PaymentResponse createPayment(@Valid @RequestBody CreatePaymentRequest request) {
+        if (!SUPPORTED_CURRENCIES.contains(request.currency())) {
+            throw new PaymentDomainException(
+                    "PAYMENT_UNSUPPORTED_CURRENCY",
+                    "Currency is not supported for payment creation: " + request.currency(),
+                    HttpStatus.BAD_REQUEST);
+        }
+
         return new PaymentResponse(
                 UUID.randomUUID().toString(),
                 request.customerId(),

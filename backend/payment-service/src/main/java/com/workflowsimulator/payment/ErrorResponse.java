@@ -5,8 +5,11 @@ import java.util.List;
 
 public record ErrorResponse(
         Instant timestamp,
+        String traceId,
+        String path,
         int status,
         String error,
+        String errorCode,
         String message,
         List<FieldError> fieldErrors) {
 
