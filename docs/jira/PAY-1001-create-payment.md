@@ -4,6 +4,10 @@
 
 Story
 
+## Status
+
+Ready for Review
+
 ## Business Requirement
 
 As a customer-facing system, I need to create a payment request so that downstream payment processing can begin.
@@ -26,7 +30,10 @@ As a customer-facing system, I need to create a payment request so that downstre
 
 ## Definition of Done
 
-- Tests pass locally.
-- CI workflow is present.
-- Documentation is updated.
+- Tests pass locally with `mvn verify`.
+- CI workflow runs `mvn verify`.
+- API design document is updated.
+- Structured validation errors are returned.
+- Domain exceptions include stable error codes.
+- Error logs include trace ID, path, error code, and support-readable message.
 
