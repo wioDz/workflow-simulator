@@ -16,8 +16,8 @@ PAY-1001 delivers the first production-shaped API in the project:
 - Correlation-aware exception logging
 - Automated tests and CI verification
 
-PAY-1002 adds payment lookup and introduces controller/service/repository/domain
-separation while persistence is still in-memory for Sprint 1.
+PAY-1002 adds payment lookup and introduces controller/service/cache/repository/domain
+separation while persistence and cache are still in-memory for Sprint 1.
 
 ## 2. Goals
 
@@ -175,6 +175,7 @@ Package structure:
 com.workflowsimulator.payment
 ├── api
 ├── application
+├── cache
 ├── domain
 ├── repository
 └── error
@@ -186,6 +187,8 @@ com.workflowsimulator.payment
 | `api.CreatePaymentRequest` | Defines create-payment request contract |
 | `api.PaymentResponse` | Defines payment response contract |
 | `application.PaymentService` | Owns payment creation, lookup, and business rules |
+| `cache.PaymentCache` | Defines fast keyed cache contract for payment reads and writes |
+| `cache.InMemoryPaymentCache` | Provides Redis-ready Sprint 1 cache behavior without external dependency |
 | `repository.PaymentRepository` | Defines persistence contract for payment storage |
 | `repository.InMemoryPaymentRepository` | Stores payments in memory for Sprint 1 workflow practice |
 | `domain.Payment` | Represents payment domain state |
@@ -208,6 +211,7 @@ Automated tests cover:
 - Domain exception log marker, error code, and message.
 - Query existing payment.
 - Query unknown payment and verify `PAYMENT_NOT_FOUND` response and log message.
+- Query cache behavior so repeated reads avoid repeated repository access.
 
 CI runs `mvn verify`, which includes unit/integration tests, Checkstyle, and
 JaCoCo verification.
@@ -218,15 +222,36 @@ PAY-1002 query behavior must avoid full-store scans. The API path receives a
 single `paymentId`, so the repository contract requires keyed lookup by that
 identifier.
 
+The service uses cache-aside lookup:
+
+```text
+GET payment -> cache.findById(paymentId)
+            -> on miss: repository.findById(paymentId)
+            -> cache.put(payment)
+            -> return payment
+```
+
+Create-payment writes through to both storage and cache:
+
+```text
+POST payment -> repository.save(payment) -> cache.put(payment)
+```
+
 Current Sprint 1 implementation:
 
+- `InMemoryPaymentCache` stores hot payments in a `ConcurrentHashMap`.
 - `InMemoryPaymentRepository` stores payments in a `ConcurrentHashMap`.
+- `PaymentService` checks cache before repository.
 - `findById(paymentId)` uses `payments.get(paymentId)`.
 - Runtime is O(1) average case for in-memory lookup.
 - The service does not load all payments and filter in application memory.
 
-Future PostgreSQL/JPA implementation must keep the same rule:
+Future Redis plus PostgreSQL/JPA implementation must keep the same rule:
 
+- Redis key should be `payment:{paymentId}` or an equivalent stable key.
+- Redis reads should happen before database reads for hot payment lookups.
+- Redis writes should happen after successful persistence.
+- Redis TTL should be explicit once payment lifecycle rules are known.
 - `payment_id` should be a primary key or unique indexed column.
 - Query should use `where payment_id = ?`.
 - Do not implement query payment with `findAll()` plus filtering.
@@ -236,7 +261,7 @@ Future PostgreSQL/JPA implementation must keep the same rule:
 Target flow:
 
 ```text
-Controller -> Service -> Repository.findById(paymentId) -> indexed/keyed lookup
+Controller -> Service -> Cache.findById(paymentId) -> Repository.findById(paymentId)
 ```
 
 Anti-pattern:

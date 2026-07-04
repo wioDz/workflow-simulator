@@ -6,7 +6,7 @@
 
 PAY-1002 adds the ability to retrieve a payment after it is created. It also
 refactors the payment service into clearer enterprise-style packages:
-controller/API, service/application, repository, domain model, and error
+controller/API, service/application, cache, repository, domain model, and error
 handling.
 
 ## Package Layout
@@ -19,6 +19,9 @@ com.workflowsimulator.payment
 │   └── PaymentResponse.java
 ├── application
 │   └── PaymentService.java
+├── cache
+│   ├── PaymentCache.java
+│   └── InMemoryPaymentCache.java
 ├── domain
 │   ├── Payment.java
 │   ├── PaymentStatus.java
@@ -41,6 +44,8 @@ com.workflowsimulator.payment
 | `domain/Payment.java` | Added payment domain record | Represent internal payment state |
 | `domain/PaymentStatus.java` | Added `CREATED` payment status enum | Avoid raw status strings in domain logic |
 | `application/PaymentService.java` | Added create and query business operations | Own payment use cases and domain validation |
+| `cache/PaymentCache.java` | Added keyed cache contract | Prepare Redis-backed quick reads and writes |
+| `cache/InMemoryPaymentCache.java` | Added Sprint 1 cache implementation | Verify cache-aside behavior without external Redis dependency |
 | `repository/PaymentRepository.java` | Added repository abstraction | Prepare for future PostgreSQL/JPA persistence |
 | `repository/InMemoryPaymentRepository.java` | Added thread-safe in-memory repository | Support Sprint 1 query workflow without a database |
 | `error/GlobalExceptionHandler.java` | Reused domain exception handling for `PAYMENT_NOT_FOUND` | Keep not-found errors structured and logged |
@@ -93,11 +98,21 @@ PAYMENT_DOMAIN_EXCEPTION traceId=test-trace-2002 path=/api/v1/payments/PAY-DOES-
 
 PAY-1002 avoids checking the entire payment store:
 
+- The service checks `PaymentCache` before repository storage.
 - The repository contract uses `findById(paymentId)`.
+- The in-memory cache uses `ConcurrentHashMap#get`.
 - The in-memory implementation uses `ConcurrentHashMap#get`.
 - The service does not call `findAll()` or filter all payments in memory.
+- Future Redis work can replace `InMemoryPaymentCache` with a Redis-backed implementation.
 - Future PostgreSQL/JPA work must use an indexed `payment_id` lookup.
 - This protects runtime, loading time, and database pressure as records grow.
+
+Cache-aside flow:
+
+```text
+Read:  cache -> repository on miss -> cache warm-up
+Write: repository save -> cache put
+```
 
 ## Verification
 
@@ -111,6 +126,6 @@ Result:
 
 ```text
 BUILD SUCCESS
-Tests run: 12, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 13, Failures: 0, Errors: 0, Skipped: 0
 All coverage checks have been met.
 ```

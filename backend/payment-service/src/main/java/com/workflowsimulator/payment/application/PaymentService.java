@@ -1,6 +1,7 @@
 package com.workflowsimulator.payment.application;
 
 import com.workflowsimulator.payment.api.CreatePaymentRequest;
+import com.workflowsimulator.payment.cache.PaymentCache;
 import com.workflowsimulator.payment.domain.Payment;
 import com.workflowsimulator.payment.domain.PaymentDomainException;
 import com.workflowsimulator.payment.domain.PaymentStatus;
@@ -16,9 +17,11 @@ public class PaymentService {
 
     private static final Set<String> SUPPORTED_CURRENCIES = Set.of("USD");
 
+    private final PaymentCache paymentCache;
     private final PaymentRepository paymentRepository;
 
-    public PaymentService(PaymentRepository paymentRepository) {
+    public PaymentService(PaymentCache paymentCache, PaymentRepository paymentRepository) {
+        this.paymentCache = paymentCache;
         this.paymentRepository = paymentRepository;
     }
 
@@ -39,14 +42,23 @@ public class PaymentService {
                 PaymentStatus.CREATED,
                 Instant.now());
 
-        return paymentRepository.save(payment);
+        Payment savedPayment = paymentRepository.save(payment);
+        paymentCache.put(savedPayment);
+        return savedPayment;
     }
 
     public Payment getPayment(String paymentId) {
-        return paymentRepository.findById(paymentId)
+        return paymentCache.findById(paymentId)
+                .orElseGet(() -> loadPaymentFromRepository(paymentId));
+    }
+
+    private Payment loadPaymentFromRepository(String paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new PaymentDomainException(
                         "PAYMENT_NOT_FOUND",
                         "Payment was not found: " + paymentId,
                         HttpStatus.NOT_FOUND));
+        paymentCache.put(payment);
+        return payment;
     }
 }
