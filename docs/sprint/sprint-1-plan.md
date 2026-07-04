@@ -10,7 +10,7 @@ Establish the repository, delivery workflow, and first payment API.
 | --- | --- | --- |
 | PAY-1001 | Create Payment API | Ready for Review |
 | PAY-1002 | Query Payment API | Ready for Review |
-| PAY-1003 | Cancel Payment API | Backlog |
+| PAY-1003 | Cancel Payment API | Ready for Review |
 
 ## Ceremonies
 

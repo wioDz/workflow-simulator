@@ -19,6 +19,9 @@ PAY-1001 delivers the first production-shaped API in the project:
 PAY-1002 adds payment lookup and introduces controller/service/cache/repository/domain
 separation while persistence and cache are still in-memory for Sprint 1.
 
+PAY-1003 adds cancellation as the first payment state transition:
+`CREATED -> CANCELLED`.
+
 ## 2. Goals
 
 - Create a payment request for a customer.
@@ -86,6 +89,25 @@ HTTP `200 OK`
 }
 ```
 
+### Cancel Payment
+
+`DELETE /api/v1/payments/{paymentId}`
+
+Success response:
+
+HTTP `200 OK`
+
+```json
+{
+  "paymentId": "generated-id",
+  "customerId": "CUS-1001",
+  "amount": 42.50,
+  "currency": "USD",
+  "status": "CANCELLED",
+  "createdAt": "2026-07-04T00:00:00Z"
+}
+```
+
 ## 5. Validation Rules
 
 | Field | Rule | Failure Type |
@@ -128,6 +150,7 @@ All client-facing errors use one response shape:
 | `PAYMENT_VALIDATION_FAILED` | 400 | Request schema or field validation failed | Fix request payload |
 | `PAYMENT_UNSUPPORTED_CURRENCY` | 400 | Currency is not currently supported | Use supported currency |
 | `PAYMENT_NOT_FOUND` | 404 | Payment ID was not found | Check payment ID or create payment first |
+| `PAYMENT_ALREADY_CANCELLED` | 409 | Payment has already been cancelled | Treat cancellation as complete or refresh payment state |
 
 ## 7. Exception and Logging Design
 
@@ -138,6 +161,7 @@ All client-facing errors use one response shape:
 | `MethodArgumentNotValidException` | 400 | WARN | `PAYMENT_VALIDATION_FAILED` |
 | `PaymentDomainException` | 400 | WARN | `PAYMENT_DOMAIN_EXCEPTION` |
 | `PaymentDomainException` | 404 | WARN | `PAYMENT_DOMAIN_EXCEPTION` |
+| `PaymentDomainException` | 409 | WARN | `PAYMENT_DOMAIN_EXCEPTION` |
 
 Log entries include:
 
@@ -212,6 +236,9 @@ Automated tests cover:
 - Query existing payment.
 - Query unknown payment and verify `PAYMENT_NOT_FOUND` response and log message.
 - Query cache behavior so repeated reads avoid repeated repository access.
+- Cancel existing payment.
+- Query cancelled payment and verify `CANCELLED` status.
+- Reject repeated cancellation with `PAYMENT_ALREADY_CANCELLED`.
 
 CI runs `mvn verify`, which includes unit/integration tests, Checkstyle, and
 JaCoCo verification.
@@ -237,6 +264,12 @@ Create-payment writes through to both storage and cache:
 POST payment -> repository.save(payment) -> cache.put(payment)
 ```
 
+Cancel-payment writes through to both storage and cache:
+
+```text
+DELETE payment -> get payment -> validate state -> repository.save(cancelled) -> cache.put(cancelled)
+```
+
 Current Sprint 1 implementation:
 
 - `InMemoryPaymentCache` stores hot payments in a `ConcurrentHashMap`.
@@ -245,6 +278,7 @@ Current Sprint 1 implementation:
 - `findById(paymentId)` uses `payments.get(paymentId)`.
 - Runtime is O(1) average case for in-memory lookup.
 - The service does not load all payments and filter in application memory.
+- Cancellation reuses keyed lookup and writes back only the target payment.
 
 Future Redis plus PostgreSQL/JPA implementation must keep the same rule:
 

@@ -1,6 +1,7 @@
 package com.workflowsimulator.payment;
 
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -239,6 +240,89 @@ class PaymentControllerTest {
                 .contains("PAYMENT_DOMAIN_EXCEPTION")
                 .contains("errorCode=PAYMENT_NOT_FOUND")
                 .contains("Payment was not found: PAY-DOES-NOT-EXIST");
+    }
+
+    @Test
+    void cancelPaymentReturnsCancelledPayment() throws Exception {
+        String paymentId = createPayment("CUS-3001", "35.00");
+
+        mockMvc.perform(delete("/api/v1/payments/{paymentId}", paymentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentId").value(paymentId))
+                .andExpect(jsonPath("$.customerId").value("CUS-3001"))
+                .andExpect(jsonPath("$.amount").value(35.00))
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.createdAt", notNullValue()));
+    }
+
+    @Test
+    void getPaymentReturnsCancelledStatusAfterCancel() throws Exception {
+        String paymentId = createPayment("CUS-3002", "49.00");
+
+        mockMvc.perform(delete("/api/v1/payments/{paymentId}", paymentId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", paymentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentId").value(paymentId))
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void cancelPaymentReturnsNotFoundForUnknownPaymentAndLogsMessage(CapturedOutput output)
+            throws Exception {
+        mockMvc.perform(delete("/api/v1/payments/{paymentId}", "PAY-CANCEL-MISSING")
+                        .header("X-Correlation-Id", "test-trace-3003"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.traceId").value("test-trace-3003"))
+                .andExpect(jsonPath("$.path").value("/api/v1/payments/PAY-CANCEL-MISSING"))
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Payment was not found: PAY-CANCEL-MISSING"));
+
+        org.assertj.core.api.Assertions.assertThat(output)
+                .contains("PAYMENT_DOMAIN_EXCEPTION")
+                .contains("errorCode=PAYMENT_NOT_FOUND")
+                .contains("Payment was not found: PAY-CANCEL-MISSING");
+    }
+
+    @Test
+    void cancelPaymentRejectsAlreadyCancelledPaymentAndLogsMessage(CapturedOutput output)
+            throws Exception {
+        String paymentId = createPayment("CUS-3004", "59.00");
+
+        mockMvc.perform(delete("/api/v1/payments/{paymentId}", paymentId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/v1/payments/{paymentId}", paymentId)
+                        .header("X-Correlation-Id", "test-trace-3004"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.traceId").value("test-trace-3004"))
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_ALREADY_CANCELLED"))
+                .andExpect(jsonPath("$.message").value("Payment is already cancelled: " + paymentId));
+
+        org.assertj.core.api.Assertions.assertThat(output)
+                .contains("PAYMENT_DOMAIN_EXCEPTION")
+                .contains("errorCode=PAYMENT_ALREADY_CANCELLED")
+                .contains("Payment is already cancelled: " + paymentId);
+    }
+
+    private String createPayment(String customerId, String amount) throws Exception {
+        MvcResult createResult = mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "%s",
+                                  "amount": %s,
+                                  "currency": "USD"
+                                }
+                                """.formatted(customerId, amount)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        return com.jayway.jsonpath.JsonPath.read(
+                createResult.getResponse().getContentAsString(),
+                "$.paymentId");
     }
 }
 

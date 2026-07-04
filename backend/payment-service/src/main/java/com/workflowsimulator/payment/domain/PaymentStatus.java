@@ -1,5 +1,6 @@
 package com.workflowsimulator.payment.domain;
 
 public enum PaymentStatus {
-    CREATED
+    CREATED,
+    CANCELLED
 }

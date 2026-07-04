@@ -10,4 +10,14 @@ public record Payment(
         String currency,
         PaymentStatus status,
         Instant createdAt) {
+
+    public Payment cancel() {
+        return new Payment(
+                paymentId,
+                customerId,
+                amount,
+                currency,
+                PaymentStatus.CANCELLED,
+                createdAt);
+    }
 }

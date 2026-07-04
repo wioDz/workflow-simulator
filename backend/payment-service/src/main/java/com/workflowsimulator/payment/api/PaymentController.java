@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import com.workflowsimulator.payment.application.PaymentService;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,6 +59,26 @@ public class PaymentController {
             content = @Content)
     public PaymentResponse getPayment(@PathVariable String paymentId) {
         return PaymentResponse.from(paymentService.getPayment(paymentId));
+    }
+
+    @DeleteMapping("/{paymentId}")
+    @Operation(
+            summary = "Cancel a payment",
+            description = "Cancels an existing payment when it is still eligible for cancellation.")
+    @ApiResponse(
+            responseCode = "200",
+            description = "Payment cancelled",
+            content = @Content(schema = @Schema(implementation = PaymentResponse.class)))
+    @ApiResponse(
+            responseCode = "404",
+            description = "Payment not found",
+            content = @Content)
+    @ApiResponse(
+            responseCode = "409",
+            description = "Payment cannot be cancelled",
+            content = @Content)
+    public PaymentResponse cancelPayment(@PathVariable String paymentId) {
+        return PaymentResponse.from(paymentService.cancelPayment(paymentId));
     }
 }
 
