@@ -52,6 +52,21 @@ public class PaymentService {
                 .orElseGet(() -> loadPaymentFromRepository(paymentId));
     }
 
+    public Payment cancelPayment(String paymentId) {
+        Payment payment = getPayment(paymentId);
+        if (payment.status() == PaymentStatus.CANCELLED) {
+            throw new PaymentDomainException(
+                    "PAYMENT_ALREADY_CANCELLED",
+                    "Payment is already cancelled: " + paymentId,
+                    HttpStatus.CONFLICT);
+        }
+
+        Payment cancelledPayment = payment.cancel();
+        Payment savedPayment = paymentRepository.save(cancelledPayment);
+        paymentCache.put(savedPayment);
+        return savedPayment;
+    }
+
     private Payment loadPaymentFromRepository(String paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new PaymentDomainException(
