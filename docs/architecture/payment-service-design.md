@@ -16,6 +16,9 @@ PAY-1001 delivers the first production-shaped API in the project:
 - Correlation-aware exception logging
 - Automated tests and CI verification
 
+PAY-1002 adds payment lookup and introduces controller/service/repository/domain
+separation while persistence is still in-memory for Sprint 1.
+
 ## 2. Goals
 
 - Create a payment request for a customer.
@@ -34,6 +37,8 @@ PAY-1001 delivers the first production-shaped API in the project:
 - No idempotency key support yet.
 
 ## 4. API Contract
+
+### Create Payment
 
 `POST /api/v1/payments`
 
@@ -59,6 +64,25 @@ HTTP `201 Created`
   "currency": "USD",
   "status": "CREATED",
   "createdAt": "2026-07-01T00:00:00Z"
+}
+```
+
+### Query Payment
+
+`GET /api/v1/payments/{paymentId}`
+
+Success response:
+
+HTTP `200 OK`
+
+```json
+{
+  "paymentId": "generated-id",
+  "customerId": "CUS-1001",
+  "amount": 42.50,
+  "currency": "USD",
+  "status": "CREATED",
+  "createdAt": "2026-07-04T00:00:00Z"
 }
 ```
 
@@ -103,6 +127,7 @@ All client-facing errors use one response shape:
 | --- | --- | --- | --- |
 | `PAYMENT_VALIDATION_FAILED` | 400 | Request schema or field validation failed | Fix request payload |
 | `PAYMENT_UNSUPPORTED_CURRENCY` | 400 | Currency is not currently supported | Use supported currency |
+| `PAYMENT_NOT_FOUND` | 404 | Payment ID was not found | Check payment ID or create payment first |
 
 ## 7. Exception and Logging Design
 
@@ -112,6 +137,7 @@ All client-facing errors use one response shape:
 | --- | --- | --- | --- |
 | `MethodArgumentNotValidException` | 400 | WARN | `PAYMENT_VALIDATION_FAILED` |
 | `PaymentDomainException` | 400 | WARN | `PAYMENT_DOMAIN_EXCEPTION` |
+| `PaymentDomainException` | 404 | WARN | `PAYMENT_DOMAIN_EXCEPTION` |
 
 Log entries include:
 
@@ -145,7 +171,12 @@ message="Currency is not supported for payment creation: EUR"
 
 | Component | Responsibility |
 | --- | --- |
-| `PaymentController` | Owns REST API contract and simple PAY-1001 domain checks |
+| `PaymentController` | Owns REST API request and response mapping |
+| `PaymentService` | Owns payment creation, lookup, and business rules |
+| `PaymentRepository` | Defines persistence contract for payment storage |
+| `InMemoryPaymentRepository` | Stores payments in memory for Sprint 1 workflow practice |
+| `Payment` | Represents payment domain state |
+| `PaymentStatus` | Defines supported payment states |
 | `PaymentDomainException` | Represents expected payment-domain failures |
 | `GlobalExceptionHandler` | Converts framework and domain exceptions to API errors |
 | `ErrorResponse` | Stable client-facing error schema |
@@ -162,6 +193,8 @@ Automated tests cover:
 - Validation log marker and message.
 - Unsupported currency domain exception.
 - Domain exception log marker, error code, and message.
+- Query existing payment.
+- Query unknown payment and verify `PAYMENT_NOT_FOUND` response and log message.
 
 CI runs `mvn verify`, which includes unit/integration tests, Checkstyle, and
 JaCoCo verification.
