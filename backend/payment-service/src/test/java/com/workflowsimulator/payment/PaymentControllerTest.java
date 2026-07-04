@@ -6,14 +6,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 class PaymentControllerTest {
 
     @Autowired
@@ -32,7 +36,11 @@ class PaymentControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.paymentId", notNullValue()))
-                .andExpect(jsonPath("$.status").value("CREATED"));
+                .andExpect(jsonPath("$.customerId").value("CUS-1001"))
+                .andExpect(jsonPath("$.amount").value(42.50))
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.status").value("CREATED"))
+                .andExpect(jsonPath("$.createdAt", notNullValue()));
     }
 
     @Test
@@ -47,6 +55,144 @@ class PaymentControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createPaymentRejectsNullAmount() throws Exception {
+        mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "CUS-1001",
+                                  "currency": "USD"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createPaymentRejectsBlankCustomerId() throws Exception {
+        mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "",
+                                  "amount": 42.50,
+                                  "currency": "USD"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createPaymentRejectsNullCustomerId() throws Exception {
+        mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 42.50,
+                                  "currency": "USD"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createPaymentRejectsBlankCurrency() throws Exception {
+        mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "CUS-1001",
+                                  "amount": 42.50,
+                                  "currency": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createPaymentRejectsNullCurrency() throws Exception {
+        mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "CUS-1001",
+                                  "amount": 42.50
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createPaymentReturnsStructuredErrorOnValidationFailure() throws Exception {
+        mockMvc.perform(post("/api/v1/payments")
+                        .header("X-Correlation-Id", "test-trace-1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "",
+                                  "amount": 0,
+                                  "currency": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp", notNullValue()))
+                .andExpect(jsonPath("$.traceId").value("test-trace-1001"))
+                .andExpect(jsonPath("$.path").value("/api/v1/payments"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed for request payload"))
+                .andExpect(jsonPath("$.fieldErrors").isArray())
+                .andExpect(jsonPath("$.fieldErrors[0].field").exists())
+                .andExpect(jsonPath("$.fieldErrors[0].rejectedValue").exists())
+                .andExpect(jsonPath("$.fieldErrors[0].message").exists());
+    }
+
+    @Test
+    void createPaymentLogsStructuredValidationError(CapturedOutput output) throws Exception {
+        mockMvc.perform(post("/api/v1/payments")
+                        .header("X-Correlation-Id", "test-trace-1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "",
+                                  "amount": 0,
+                                  "currency": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        org.assertj.core.api.Assertions.assertThat(output)
+                .contains("PAYMENT_VALIDATION_FAILED")
+                .contains("traceId=test-trace-1001")
+                .contains("Validation failed for request payload");
+    }
+
+    @Test
+    void createPaymentRejectsUnsupportedCurrencyAndLogsMessage(CapturedOutput output)
+            throws Exception {
+        mockMvc.perform(post("/api/v1/payments")
+                        .header("X-Correlation-Id", "test-trace-1002")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "CUS-1001",
+                                  "amount": 42.50,
+                                  "currency": "EUR"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.traceId").value("test-trace-1002"))
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_UNSUPPORTED_CURRENCY"))
+                .andExpect(jsonPath("$.message")
+                        .value("Currency is not supported for payment creation: EUR"));
+
+        org.assertj.core.api.Assertions.assertThat(output)
+                .contains("PAYMENT_DOMAIN_EXCEPTION")
+                .contains("errorCode=PAYMENT_UNSUPPORTED_CURRENCY")
+                .contains("Currency is not supported for payment creation: EUR");
     }
 }
 
