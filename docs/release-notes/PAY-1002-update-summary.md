@@ -89,6 +89,16 @@ Unknown payment IDs log a searchable domain exception:
 PAYMENT_DOMAIN_EXCEPTION traceId=test-trace-2002 path=/api/v1/payments/PAY-DOES-NOT-EXIST errorCode=PAYMENT_NOT_FOUND message="Payment was not found: PAY-DOES-NOT-EXIST"
 ```
 
+## Query Performance Design
+
+PAY-1002 avoids checking the entire payment store:
+
+- The repository contract uses `findById(paymentId)`.
+- The in-memory implementation uses `ConcurrentHashMap#get`.
+- The service does not call `findAll()` or filter all payments in memory.
+- Future PostgreSQL/JPA work must use an indexed `payment_id` lookup.
+- This protects runtime, loading time, and database pressure as records grow.
+
 ## Verification
 
 Command:

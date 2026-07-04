@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class InMemoryPaymentRepository implements PaymentRepository {
 
+    // paymentId is the key so query performance stays O(1) for the Sprint 1 in-memory store.
     private final Map<String, Payment> payments = new ConcurrentHashMap<>();
 
     @Override

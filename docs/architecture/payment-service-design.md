@@ -212,7 +212,40 @@ Automated tests cover:
 CI runs `mvn verify`, which includes unit/integration tests, Checkstyle, and
 JaCoCo verification.
 
-## 10. Operational Checks
+## 10. Query Performance Design
+
+PAY-1002 query behavior must avoid full-store scans. The API path receives a
+single `paymentId`, so the repository contract requires keyed lookup by that
+identifier.
+
+Current Sprint 1 implementation:
+
+- `InMemoryPaymentRepository` stores payments in a `ConcurrentHashMap`.
+- `findById(paymentId)` uses `payments.get(paymentId)`.
+- Runtime is O(1) average case for in-memory lookup.
+- The service does not load all payments and filter in application memory.
+
+Future PostgreSQL/JPA implementation must keep the same rule:
+
+- `payment_id` should be a primary key or unique indexed column.
+- Query should use `where payment_id = ?`.
+- Do not implement query payment with `findAll()` plus filtering.
+- Avoid eager loading unrelated child records for the query endpoint.
+- Return one row or no row to reduce database pressure, runtime, and loading time.
+
+Target flow:
+
+```text
+Controller -> Service -> Repository.findById(paymentId) -> indexed/keyed lookup
+```
+
+Anti-pattern:
+
+```text
+Controller -> Service -> Repository.findAll() -> loop/filter in Java
+```
+
+## 11. Operational Checks
 
 Support engineers can troubleshoot PAY-1001 failures by:
 
@@ -221,7 +254,7 @@ Support engineers can troubleshoot PAY-1001 failures by:
 3. Checking `errorCode` to identify validation vs domain failure.
 4. Comparing the API response `message` with the logged exception message.
 
-## 11. Next Iterations
+## 12. Next Iterations
 
 - Add PostgreSQL persistence.
 - Add idempotency key support.

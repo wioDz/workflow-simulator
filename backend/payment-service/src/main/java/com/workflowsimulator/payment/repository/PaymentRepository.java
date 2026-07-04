@@ -7,5 +7,6 @@ public interface PaymentRepository {
 
     Payment save(Payment payment);
 
+    // Contract: implementations must use keyed lookup and avoid scanning the full payment store.
     Optional<Payment> findById(String paymentId);
 }
