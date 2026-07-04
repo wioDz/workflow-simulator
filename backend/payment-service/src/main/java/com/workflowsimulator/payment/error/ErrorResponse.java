@@ -1,4 +1,4 @@
-package com.workflowsimulator.payment;
+package com.workflowsimulator.payment.error;
 
 import java.time.Instant;
 import java.util.List;

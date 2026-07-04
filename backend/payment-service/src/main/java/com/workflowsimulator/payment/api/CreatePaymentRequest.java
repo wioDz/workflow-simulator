@@ -1,4 +1,4 @@
-package com.workflowsimulator.payment;
+package com.workflowsimulator.payment.api;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
-record CreatePaymentRequest(
+public record CreatePaymentRequest(
         @NotBlank @Schema(description = "Customer identifier", example = "CUS-1001") String customerId,
         @NotNull @DecimalMin(value = "0.01") @Schema(description = "Payment amount", example = "42.50")
                 BigDecimal amount,

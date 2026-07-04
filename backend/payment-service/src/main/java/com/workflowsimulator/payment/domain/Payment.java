@@ -1,9 +1,9 @@
-package com.workflowsimulator.payment;
+package com.workflowsimulator.payment.domain;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 
-record Payment(
+public record Payment(
         String paymentId,
         String customerId,
         BigDecimal amount,

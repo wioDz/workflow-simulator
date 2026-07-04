@@ -5,22 +5,45 @@
 `PAY-1002 Query Payment API`
 
 PAY-1002 adds the ability to retrieve a payment after it is created. It also
-refactors the payment service into clearer enterprise-style responsibilities:
-controller, service, repository, and domain model.
+refactors the payment service into clearer enterprise-style packages:
+controller/API, service/application, repository, domain model, and error
+handling.
+
+## Package Layout
+
+```text
+com.workflowsimulator.payment
+├── api
+│   ├── PaymentController.java
+│   ├── CreatePaymentRequest.java
+│   └── PaymentResponse.java
+├── application
+│   └── PaymentService.java
+├── domain
+│   ├── Payment.java
+│   ├── PaymentStatus.java
+│   └── PaymentDomainException.java
+├── repository
+│   ├── PaymentRepository.java
+│   └── InMemoryPaymentRepository.java
+└── error
+    ├── ErrorResponse.java
+    └── GlobalExceptionHandler.java
+```
 
 ## Code Updates
 
 | File | Update | Purpose |
 | --- | --- | --- |
-| `PaymentController.java` | Added `GET /api/v1/payments/{paymentId}` and moved business logic out of controller | Keep HTTP layer focused on request and response handling |
-| `CreatePaymentRequest.java` | Extracted create-payment request DTO | Keep request contract in its own file |
-| `PaymentResponse.java` | Extracted payment response DTO and mapper from domain model | Keep API response contract stable |
-| `Payment.java` | Added payment domain record | Represent internal payment state |
-| `PaymentStatus.java` | Added `CREATED` payment status enum | Avoid raw status strings in domain logic |
-| `PaymentService.java` | Added create and query business operations | Own payment use cases and domain validation |
-| `PaymentRepository.java` | Added repository abstraction | Prepare for future PostgreSQL/JPA persistence |
-| `InMemoryPaymentRepository.java` | Added thread-safe in-memory repository | Support Sprint 1 query workflow without a database |
-| `GlobalExceptionHandler.java` | Reused domain exception handling for `PAYMENT_NOT_FOUND` | Keep not-found errors structured and logged |
+| `api/PaymentController.java` | Added `GET /api/v1/payments/{paymentId}` and moved business logic out of controller | Keep HTTP layer focused on request and response handling |
+| `api/CreatePaymentRequest.java` | Extracted create-payment request DTO | Keep request contract in its own file |
+| `api/PaymentResponse.java` | Extracted payment response DTO and mapper from domain model | Keep API response contract stable |
+| `domain/Payment.java` | Added payment domain record | Represent internal payment state |
+| `domain/PaymentStatus.java` | Added `CREATED` payment status enum | Avoid raw status strings in domain logic |
+| `application/PaymentService.java` | Added create and query business operations | Own payment use cases and domain validation |
+| `repository/PaymentRepository.java` | Added repository abstraction | Prepare for future PostgreSQL/JPA persistence |
+| `repository/InMemoryPaymentRepository.java` | Added thread-safe in-memory repository | Support Sprint 1 query workflow without a database |
+| `error/GlobalExceptionHandler.java` | Reused domain exception handling for `PAYMENT_NOT_FOUND` | Keep not-found errors structured and logged |
 | `PaymentControllerTest.java` | Added query success and not-found tests | Verify API behavior and log message contract |
 
 ## API Added
@@ -81,4 +104,3 @@ BUILD SUCCESS
 Tests run: 12, Failures: 0, Errors: 0, Skipped: 0
 All coverage checks have been met.
 ```
-

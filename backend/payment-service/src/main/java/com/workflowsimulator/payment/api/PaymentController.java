@@ -1,4 +1,4 @@
-package com.workflowsimulator.payment;
+package com.workflowsimulator.payment.api;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import com.workflowsimulator.payment.application.PaymentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,11 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/payments")
 @Tag(name = "Payment", description = "Payment management APIs")
-class PaymentController {
+public class PaymentController {
 
     private final PaymentService paymentService;
 
-    PaymentController(PaymentService paymentService) {
+    public PaymentController(PaymentService paymentService) {
         this.paymentService = paymentService;
     }
 
@@ -39,7 +40,7 @@ class PaymentController {
             responseCode = "400",
             description = "Invalid request payload",
             content = @Content)
-    PaymentResponse createPayment(@Valid @RequestBody CreatePaymentRequest request) {
+    public PaymentResponse createPayment(@Valid @RequestBody CreatePaymentRequest request) {
         return PaymentResponse.from(paymentService.createPayment(request));
     }
 
@@ -55,7 +56,7 @@ class PaymentController {
             responseCode = "404",
             description = "Payment not found",
             content = @Content)
-    PaymentResponse getPayment(@PathVariable String paymentId) {
+    public PaymentResponse getPayment(@PathVariable String paymentId) {
         return PaymentResponse.from(paymentService.getPayment(paymentId));
     }
 }

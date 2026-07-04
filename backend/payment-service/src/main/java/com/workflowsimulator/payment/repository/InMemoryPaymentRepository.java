@@ -1,12 +1,13 @@
-package com.workflowsimulator.payment;
+package com.workflowsimulator.payment.repository;
 
+import com.workflowsimulator.payment.domain.Payment;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Repository;
 
 @Repository
-class InMemoryPaymentRepository implements PaymentRepository {
+public class InMemoryPaymentRepository implements PaymentRepository {
 
     private final Map<String, Payment> payments = new ConcurrentHashMap<>();
 

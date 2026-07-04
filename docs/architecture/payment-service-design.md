@@ -169,17 +169,30 @@ message="Currency is not supported for payment creation: EUR"
 
 ## 8. Component Design
 
+Package structure:
+
+```text
+com.workflowsimulator.payment
+├── api
+├── application
+├── domain
+├── repository
+└── error
+```
+
 | Component | Responsibility |
 | --- | --- |
-| `PaymentController` | Owns REST API request and response mapping |
-| `PaymentService` | Owns payment creation, lookup, and business rules |
-| `PaymentRepository` | Defines persistence contract for payment storage |
-| `InMemoryPaymentRepository` | Stores payments in memory for Sprint 1 workflow practice |
-| `Payment` | Represents payment domain state |
-| `PaymentStatus` | Defines supported payment states |
-| `PaymentDomainException` | Represents expected payment-domain failures |
-| `GlobalExceptionHandler` | Converts framework and domain exceptions to API errors |
-| `ErrorResponse` | Stable client-facing error schema |
+| `api.PaymentController` | Owns REST API request and response mapping |
+| `api.CreatePaymentRequest` | Defines create-payment request contract |
+| `api.PaymentResponse` | Defines payment response contract |
+| `application.PaymentService` | Owns payment creation, lookup, and business rules |
+| `repository.PaymentRepository` | Defines persistence contract for payment storage |
+| `repository.InMemoryPaymentRepository` | Stores payments in memory for Sprint 1 workflow practice |
+| `domain.Payment` | Represents payment domain state |
+| `domain.PaymentStatus` | Defines supported payment states |
+| `domain.PaymentDomainException` | Represents expected payment-domain failures |
+| `error.GlobalExceptionHandler` | Converts framework and domain exceptions to API errors |
+| `error.ErrorResponse` | Stable client-facing error schema |
 | `PaymentControllerTest` | Verifies success, validation, domain errors, and logs |
 
 ## 9. Test Strategy

@@ -1,5 +1,10 @@
-package com.workflowsimulator.payment;
+package com.workflowsimulator.payment.application;
 
+import com.workflowsimulator.payment.api.CreatePaymentRequest;
+import com.workflowsimulator.payment.domain.Payment;
+import com.workflowsimulator.payment.domain.PaymentDomainException;
+import com.workflowsimulator.payment.domain.PaymentStatus;
+import com.workflowsimulator.payment.repository.PaymentRepository;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -7,17 +12,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
-class PaymentService {
+public class PaymentService {
 
     private static final Set<String> SUPPORTED_CURRENCIES = Set.of("USD");
 
     private final PaymentRepository paymentRepository;
 
-    PaymentService(PaymentRepository paymentRepository) {
+    public PaymentService(PaymentRepository paymentRepository) {
         this.paymentRepository = paymentRepository;
     }
 
-    Payment createPayment(CreatePaymentRequest request) {
+    public Payment createPayment(CreatePaymentRequest request) {
         // PAY-1001 keeps currency support explicit until configuration-backed rules are introduced.
         if (!SUPPORTED_CURRENCIES.contains(request.currency())) {
             throw new PaymentDomainException(
@@ -37,7 +42,7 @@ class PaymentService {
         return paymentRepository.save(payment);
     }
 
-    Payment getPayment(String paymentId) {
+    public Payment getPayment(String paymentId) {
         return paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new PaymentDomainException(
                         "PAYMENT_NOT_FOUND",
