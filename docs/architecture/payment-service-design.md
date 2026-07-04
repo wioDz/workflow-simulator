@@ -193,7 +193,7 @@ com.workflowsimulator.payment
 | `repository.InMemoryPaymentRepository` | Stores payments in memory for Sprint 1 workflow practice |
 | `domain.Payment` | Represents payment domain state |
 | `domain.PaymentStatus` | Defines supported payment states |
-| `domain.PaymentDomainException` | Represents expected payment-domain failures |
+| `error.PaymentDomainException` | Represents expected payment-domain failures |
 | `error.GlobalExceptionHandler` | Converts framework and domain exceptions to API errors |
 | `error.ErrorResponse` | Stable client-facing error schema |
 | `PaymentControllerTest` | Verifies success, validation, domain errors, and logs |

@@ -1,4 +1,4 @@
-package com.workflowsimulator.payment.domain;
+package com.workflowsimulator.payment.error;
 
 import org.springframework.http.HttpStatus;
 

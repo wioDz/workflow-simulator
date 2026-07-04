@@ -1,6 +1,5 @@
 package com.workflowsimulator.payment.error;
 
-import com.workflowsimulator.payment.domain.PaymentDomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.Collections;

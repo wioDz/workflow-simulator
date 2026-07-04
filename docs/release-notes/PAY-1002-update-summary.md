@@ -24,14 +24,14 @@ com.workflowsimulator.payment
 │   └── InMemoryPaymentCache.java
 ├── domain
 │   ├── Payment.java
-│   ├── PaymentStatus.java
-│   └── PaymentDomainException.java
+│   └── PaymentStatus.java
 ├── repository
 │   ├── PaymentRepository.java
 │   └── InMemoryPaymentRepository.java
 └── error
     ├── ErrorResponse.java
-    └── GlobalExceptionHandler.java
+    ├── GlobalExceptionHandler.java
+    └── PaymentDomainException.java
 ```
 
 ## Code Updates
