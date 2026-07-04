@@ -16,6 +16,9 @@ PAY-1001 delivers the first production-shaped API in the project:
 - Correlation-aware exception logging
 - Automated tests and CI verification
 
+PAY-1002 adds payment lookup and introduces controller/service/cache/repository/domain
+separation while persistence and cache are still in-memory for Sprint 1.
+
 ## 2. Goals
 
 - Create a payment request for a customer.
@@ -34,6 +37,8 @@ PAY-1001 delivers the first production-shaped API in the project:
 - No idempotency key support yet.
 
 ## 4. API Contract
+
+### Create Payment
 
 `POST /api/v1/payments`
 
@@ -59,6 +64,25 @@ HTTP `201 Created`
   "currency": "USD",
   "status": "CREATED",
   "createdAt": "2026-07-01T00:00:00Z"
+}
+```
+
+### Query Payment
+
+`GET /api/v1/payments/{paymentId}`
+
+Success response:
+
+HTTP `200 OK`
+
+```json
+{
+  "paymentId": "generated-id",
+  "customerId": "CUS-1001",
+  "amount": 42.50,
+  "currency": "USD",
+  "status": "CREATED",
+  "createdAt": "2026-07-04T00:00:00Z"
 }
 ```
 
@@ -103,6 +127,7 @@ All client-facing errors use one response shape:
 | --- | --- | --- | --- |
 | `PAYMENT_VALIDATION_FAILED` | 400 | Request schema or field validation failed | Fix request payload |
 | `PAYMENT_UNSUPPORTED_CURRENCY` | 400 | Currency is not currently supported | Use supported currency |
+| `PAYMENT_NOT_FOUND` | 404 | Payment ID was not found | Check payment ID or create payment first |
 
 ## 7. Exception and Logging Design
 
@@ -112,6 +137,7 @@ All client-facing errors use one response shape:
 | --- | --- | --- | --- |
 | `MethodArgumentNotValidException` | 400 | WARN | `PAYMENT_VALIDATION_FAILED` |
 | `PaymentDomainException` | 400 | WARN | `PAYMENT_DOMAIN_EXCEPTION` |
+| `PaymentDomainException` | 404 | WARN | `PAYMENT_DOMAIN_EXCEPTION` |
 
 Log entries include:
 
@@ -143,12 +169,33 @@ message="Currency is not supported for payment creation: EUR"
 
 ## 8. Component Design
 
+Package structure:
+
+```text
+com.workflowsimulator.payment
+├── api
+├── application
+├── cache
+├── domain
+├── repository
+└── error
+```
+
 | Component | Responsibility |
 | --- | --- |
-| `PaymentController` | Owns REST API contract and simple PAY-1001 domain checks |
-| `PaymentDomainException` | Represents expected payment-domain failures |
-| `GlobalExceptionHandler` | Converts framework and domain exceptions to API errors |
-| `ErrorResponse` | Stable client-facing error schema |
+| `api.PaymentController` | Owns REST API request and response mapping |
+| `api.CreatePaymentRequest` | Defines create-payment request contract |
+| `api.PaymentResponse` | Defines payment response contract |
+| `application.PaymentService` | Owns payment creation, lookup, and business rules |
+| `cache.PaymentCache` | Defines fast keyed cache contract for payment reads and writes |
+| `cache.InMemoryPaymentCache` | Provides Redis-ready Sprint 1 cache behavior without external dependency |
+| `repository.PaymentRepository` | Defines persistence contract for payment storage |
+| `repository.InMemoryPaymentRepository` | Stores payments in memory for Sprint 1 workflow practice |
+| `domain.Payment` | Represents payment domain state |
+| `domain.PaymentStatus` | Defines supported payment states |
+| `error.PaymentDomainException` | Represents expected payment-domain failures |
+| `error.GlobalExceptionHandler` | Converts framework and domain exceptions to API errors |
+| `error.ErrorResponse` | Stable client-facing error schema |
 | `PaymentControllerTest` | Verifies success, validation, domain errors, and logs |
 
 ## 9. Test Strategy
@@ -162,11 +209,68 @@ Automated tests cover:
 - Validation log marker and message.
 - Unsupported currency domain exception.
 - Domain exception log marker, error code, and message.
+- Query existing payment.
+- Query unknown payment and verify `PAYMENT_NOT_FOUND` response and log message.
+- Query cache behavior so repeated reads avoid repeated repository access.
 
 CI runs `mvn verify`, which includes unit/integration tests, Checkstyle, and
 JaCoCo verification.
 
-## 10. Operational Checks
+## 10. Query Performance Design
+
+PAY-1002 query behavior must avoid full-store scans. The API path receives a
+single `paymentId`, so the repository contract requires keyed lookup by that
+identifier.
+
+The service uses cache-aside lookup:
+
+```text
+GET payment -> cache.findById(paymentId)
+            -> on miss: repository.findById(paymentId)
+            -> cache.put(payment)
+            -> return payment
+```
+
+Create-payment writes through to both storage and cache:
+
+```text
+POST payment -> repository.save(payment) -> cache.put(payment)
+```
+
+Current Sprint 1 implementation:
+
+- `InMemoryPaymentCache` stores hot payments in a `ConcurrentHashMap`.
+- `InMemoryPaymentRepository` stores payments in a `ConcurrentHashMap`.
+- `PaymentService` checks cache before repository.
+- `findById(paymentId)` uses `payments.get(paymentId)`.
+- Runtime is O(1) average case for in-memory lookup.
+- The service does not load all payments and filter in application memory.
+
+Future Redis plus PostgreSQL/JPA implementation must keep the same rule:
+
+- Redis key should be `payment:{paymentId}` or an equivalent stable key.
+- Redis reads should happen before database reads for hot payment lookups.
+- Redis writes should happen after successful persistence.
+- Redis TTL should be explicit once payment lifecycle rules are known.
+- `payment_id` should be a primary key or unique indexed column.
+- Query should use `where payment_id = ?`.
+- Do not implement query payment with `findAll()` plus filtering.
+- Avoid eager loading unrelated child records for the query endpoint.
+- Return one row or no row to reduce database pressure, runtime, and loading time.
+
+Target flow:
+
+```text
+Controller -> Service -> Cache.findById(paymentId) -> Repository.findById(paymentId)
+```
+
+Anti-pattern:
+
+```text
+Controller -> Service -> Repository.findAll() -> loop/filter in Java
+```
+
+## 11. Operational Checks
 
 Support engineers can troubleshoot PAY-1001 failures by:
 
@@ -175,7 +279,7 @@ Support engineers can troubleshoot PAY-1001 failures by:
 3. Checking `errorCode` to identify validation vs domain failure.
 4. Comparing the API response `message` with the logged exception message.
 
-## 11. Next Iterations
+## 12. Next Iterations
 
 - Add PostgreSQL persistence.
 - Add idempotency key support.

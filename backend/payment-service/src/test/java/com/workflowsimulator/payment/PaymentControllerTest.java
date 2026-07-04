@@ -1,6 +1,7 @@
 package com.workflowsimulator.payment;
 
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -193,6 +195,50 @@ class PaymentControllerTest {
                 .contains("PAYMENT_DOMAIN_EXCEPTION")
                 .contains("errorCode=PAYMENT_UNSUPPORTED_CURRENCY")
                 .contains("Currency is not supported for payment creation: EUR");
+    }
+
+    @Test
+    void getPaymentReturnsPreviouslyCreatedPayment() throws Exception {
+        MvcResult createResult = mockMvc.perform(post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "customerId": "CUS-2001",
+                                  "amount": 19.99,
+                                  "currency": "USD"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String response = createResult.getResponse().getContentAsString();
+        String paymentId = com.jayway.jsonpath.JsonPath.read(response, "$.paymentId");
+
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", paymentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentId").value(paymentId))
+                .andExpect(jsonPath("$.customerId").value("CUS-2001"))
+                .andExpect(jsonPath("$.amount").value(19.99))
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.status").value("CREATED"))
+                .andExpect(jsonPath("$.createdAt", notNullValue()));
+    }
+
+    @Test
+    void getPaymentReturnsNotFoundForUnknownPaymentAndLogsMessage(CapturedOutput output)
+            throws Exception {
+        mockMvc.perform(get("/api/v1/payments/{paymentId}", "PAY-DOES-NOT-EXIST")
+                        .header("X-Correlation-Id", "test-trace-2002"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.traceId").value("test-trace-2002"))
+                .andExpect(jsonPath("$.path").value("/api/v1/payments/PAY-DOES-NOT-EXIST"))
+                .andExpect(jsonPath("$.errorCode").value("PAYMENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Payment was not found: PAY-DOES-NOT-EXIST"));
+
+        org.assertj.core.api.Assertions.assertThat(output)
+                .contains("PAYMENT_DOMAIN_EXCEPTION")
+                .contains("errorCode=PAYMENT_NOT_FOUND")
+                .contains("Payment was not found: PAY-DOES-NOT-EXIST");
     }
 }
 
